@@ -19,30 +19,63 @@ namespace AdmitResultAPI.Model
         //{
         //    _data = data;
         //}
+        //public InterPracticaladmitPdf(List<StudentWithSubjectsDto> data)
+        //{
+        //    _data = data;
+        //    _bsebLogo = LoadImageFromUrl("https://intermediate.biharboardonline.com/Exam26/assets/img/bsebimage.jpg");
+        //    //string imagePath = HttpContext.Current.Server.MapPath("~/Upload/bsebimage.jpg");
+        //    //_bsebLogo = LoadImageFromFile(imagePath);
+
+
+
+
+        //    // Initialize dictionaries for storing photos and signatures
+        //    _Photos = new Dictionary<int, byte[]>();
+        //    _Signatures = new Dictionary<int, byte[]>();
+
+        //    // Load images for each student with fallback logic
+        //    foreach (var student in _data)
+        //    {
+        //        // Construct the full URLs
+        //        string photoUrl = $"https://intermediate.biharboardonline.com/Exam26/Uploads/StudentsReg/Photos/{student.Student.StudentPhotoPath}";
+        //        string signatureUrl = $"https://intermediate.biharboardonline.com/Exam26/Uploads/StudentsReg/Signatures/{student.Student.StudentSignaturePath}";
+
+        //        // Load photo and signature with fallback to the default BSEB logo if not found
+        //        _Photos[student.Student.StudentID] = LoadImageFromUrlWithFallback(photoUrl);
+        //        _Signatures[student.Student.StudentID] = LoadImageFromUrlWithFallback(signatureUrl);
+        //    }
+        //}
+
         public InterPracticaladmitPdf(List<StudentWithSubjectsDto> data)
         {
             _data = data;
-            //_bsebLogo = LoadImageFromUrl("https://intermediate.biharboardonline.com/Exam26/assets/img/bsebimage.jpg");
-            string imagePath = HttpContext.Current.Server.MapPath("~/Upload/bsebimage.jpg");
-            _bsebLogo = LoadImageFromFile(imagePath);
 
+            // Header logo only
+            _bsebLogo = LoadImageFromFile("Assets/bsebimage.jpg");
 
-
-
-            // Initialize dictionaries for storing photos and signatures
             _Photos = new Dictionary<int, byte[]>();
             _Signatures = new Dictionary<int, byte[]>();
 
-            // Load images for each student with fallback logic
             foreach (var student in _data)
             {
-                // Construct the full URLs
-                string photoUrl = $"https://intermediate.biharboardonline.com/Exam26/Uploads/StudentsReg/Photos/{student.Student.StudentPhotoPath}";
-                string signatureUrl = $"https://intermediate.biharboardonline.com/Exam26/Uploads/StudentsReg/Signatures/{student.Student.StudentSignaturePath}";
+                var photoPath = $"Uploads/Photos/{student.Student.StudentPhotoPath}";
+                var signPath = $"Uploads/Signatures/{student.Student.StudentSignaturePath}";
 
-                // Load photo and signature with fallback to the default BSEB logo if not found
-                _Photos[student.Student.StudentID] = LoadImageFromUrlWithFallback(photoUrl);
-                _Signatures[student.Student.StudentID] = LoadImageFromUrlWithFallback(signatureUrl);
+                // PHOTO: fallback to BSEB logo
+                //_Photos[student.Student.StudentID] = LoadImageFromFile(photoPath) ?? _bsebLogo;
+
+                var photoBytes = LoadImageFromFile(photoPath);
+                if (photoBytes != null)
+                {
+                    _Photos[student.Student.StudentID] = photoBytes;
+                }
+
+                // SIGNATURE: store ONLY if exists (no fallback)
+                var signBytes = LoadImageFromFile(signPath);
+                if (signBytes != null)
+                {
+                    _Signatures[student.Student.StudentID] = signBytes;
+                }
             }
         }
 
@@ -121,13 +154,21 @@ namespace AdmitResultAPI.Model
 
                                     table.Cell().Border(1).Padding(6).Column(c =>
                                     {
-                                        // PHOTO
-                                        var photo = _Photos.ContainsKey(student.StudentID) ? _Photos[student.StudentID] : null;
-                                        c.Item().Height(50).AlignCenter().AlignMiddle().Image(photo ?? _bsebLogo, ImageScaling.FitHeight);  // FitHeight ensures the image fits in the available space
+                                        // PHOTO (always exists because logo fallback)
+                                        var photo = _Photos[student.StudentID];
+                                        c.Item().Height(50).AlignCenter().AlignMiddle().Image(photo, ImageScaling.FitHeight);
 
-                                        // SIGNATURE
-                                        var signature = _Signatures.ContainsKey(student.StudentID) ? _Signatures[student.StudentID] : null;
-                                        c.Item().Height(30).AlignCenter().AlignMiddle().Image(signature ?? _bsebLogo, ImageScaling.FitHeight);  // FitHeight ensures the image fits in the available space
+                                        // SIGNATURE (draw only if available)
+                                        if (_Signatures.TryGetValue(student.StudentID, out var signature))
+                                        {
+                                            c.Item().Height(30).AlignCenter().AlignMiddle().Image(signature, ImageScaling.FitHeight);
+                                        }
+                                        else
+                                        {
+                                            // Blank space for signature
+                                            c.Item().Height(30);
+                                        }
+                                        // FitHeight ensures the image fits in the available space
                                     });
                                 });
 
@@ -263,13 +304,19 @@ namespace AdmitResultAPI.Model
 
                                     table.Cell().Border(1).Padding(6).Column(c =>
                                     {
-                                        // PHOTO
-                                        var photo = _Photos.ContainsKey(student.StudentID) ? _Photos[student.StudentID] : null;
-                                        c.Item().Height(50).AlignCenter().AlignMiddle().Image(photo ?? _bsebLogo, ImageScaling.FitHeight);  // FitHeight ensures the image fits in the available space
+                                        var photo = _Photos[student.StudentID];
+                                        c.Item().Height(50).AlignCenter().AlignMiddle().Image(photo, ImageScaling.FitHeight);
 
-                                        // SIGNATURE
-                                        var signature = _Signatures.ContainsKey(student.StudentID) ? _Signatures[student.StudentID] : null;
-                                        c.Item().Height(30).AlignCenter().AlignMiddle().Image(signature ?? _bsebLogo, ImageScaling.FitHeight);  // FitHeight ensures the image fits in the available space
+                                        // SIGNATURE (draw only if available)
+                                        if (_Signatures.TryGetValue(student.StudentID, out var signature))
+                                        {
+                                            c.Item().Height(30).AlignCenter().AlignMiddle().Image(signature, ImageScaling.FitHeight);
+                                        }
+                                        else
+                                        {
+                                            // Blank space for signature
+                                            c.Item().Height(30);
+                                        }  // FitHeight ensures the image fits in the available space
                                     });
                                 });
 
@@ -407,40 +454,36 @@ namespace AdmitResultAPI.Model
             }
         }
 
+        private static byte[] LoadImageFromFile(string fileName)
+        {
+            var root = Path.GetDirectoryName(
+                System.Reflection.Assembly.GetExecutingAssembly().Location)!;
+
+            var fullPath = Path.Combine(root, fileName);
+
+            if (!File.Exists(fullPath))
+                throw new FileNotFoundException(fullPath);
+
+            return File.ReadAllBytes(fullPath);
+        }
+
+
+
+
         //private static byte[] LoadImageFromUrl(string imageUrl)
         //{
         //    try
         //    {
-        //        using var handler = new HttpClientHandler
-        //        {
-        //            // Bypass SSL certificate validation
-        //            ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
-        //        };
-
-        //        using var client = new HttpClient(handler);
+        //        using var client = new HttpClient();
         //        return client.GetByteArrayAsync(imageUrl).GetAwaiter().GetResult();
         //    }
         //    catch (Exception ex)
         //    {
-        //        // Log or handle exception as needed
-        //        return null;
+
+        //        throw;
         //    }
+
         //}
-
-        private static byte[] LoadImageFromUrl(string imageUrl)
-        {
-            try
-            {
-                using var client = new HttpClient();
-                return client.GetByteArrayAsync(imageUrl).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-
-                throw;
-            }
-
-        }
 
         private class CategorizedSubjects
         {
